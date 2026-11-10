@@ -1,0 +1,6 @@
+# dazi-bot bundle patch: registers the connectors installed for WorkDazi as
+# MCP servers in the host's mcp-manager. The mcp-manager row comes from
+# dsh-web-app, so list this bundle after it in the profile.
+- insert:
+    - id: dazi-bot-connectors
+      name: '@dazi/dsh-dazi-bot'

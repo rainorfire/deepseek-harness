@@ -16,6 +16,7 @@
     "native/**",
     "**/*.js",
     "**/*.mjs",
+    "**/*.d.ts",
     "**/*.config.ts",
     "packages/client/tsdown.client.ts"
   ]

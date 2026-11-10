@@ -27,6 +27,9 @@ importers:
 
   .:
     devDependencies:
+      '@dazi/dsh-dazi-bot':
+        specifier: workspace:*
+        version: link:packages/dazi/dazi-bot
       '@deepseek-ai/dsh-action-cards':
         specifier: workspace:*
         version: link:packages/experimental/action-cards
@@ -2942,6 +2945,9 @@ importers:
 
   packages/bundle/web-app:
     dependencies:
+      '@dazi/dsh-dazi-bot':
+        specifier: workspace:*
+        version: link:../../dazi/dazi-bot
       '@deepseek-ai/dsh-agent-instructions':
         specifier: workspace:*
         version: link:../../context/agent-instructions
@@ -8200,10 +8206,6 @@ importers:
 
   packages/dazi/dazi-bot:
     dependencies:
-      '@deepseek-ai/schemastery':
-        specifier: link:../../../vendor/schemastery
-        version: link:../../../vendor/schemastery
-    devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis

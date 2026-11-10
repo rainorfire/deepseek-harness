@@ -55,6 +55,7 @@
     }
   },
   "dependencies": {
+    "@dazi/dsh-dazi-bot": "workspace:*",
     "@deepseek-ai/dsh-agent-instructions": "workspace:*",
     "@deepseek-ai/dsh-agent-preset": "workspace:*",
     "@deepseek-ai/dsh-agent-preset-registry": "workspace:*",

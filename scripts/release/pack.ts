@@ -93,11 +93,14 @@ export function parsePackConcurrency(raw: string | undefined): number {
  */
 export async function packFamilyMembers(
   root: string, family: ReleaseFamily, destination: string, concurrency: number,
+  options: { keepDestination?: boolean } = {},
 ): Promise<string[]> {
   const members = family.publishOrder(family.members(root)).order
   family.verifyVersions(members)
-  rmSync(destination, { recursive: true, force: true })
-  mkdirSync(destination, { recursive: true })
+  if (options.keepDestination !== true) {
+    rmSync(destination, { recursive: true, force: true })
+    mkdirSync(destination, { recursive: true })
+  }
   return packMembers(family, members, destination, concurrency)
 }
 

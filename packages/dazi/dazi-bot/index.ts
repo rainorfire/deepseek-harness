@@ -29,14 +29,14 @@ import {
   DAZI_STORE_PATH, DEFAULT_CATALOG_PATH, GATEWAY_PATH,
   expandHome, fetchEnabledRemoteInstances, isEnabled, listCatalog,
   readCatalog, readGateway, readInstances, readSessionEnabledIds,
-} from './connectors.ts'
+} from './connectors.js'
 import type {
   CatalogItem, CatalogListing, EnabledRemoteInstance, StoredInstance,
-} from './connectors.ts'
+} from './connectors.js'
 
 export type {
   CatalogItem, CatalogListing, ConnectorTransport, StoredInstance,
-} from './connectors.ts'
+} from './connectors.js'
 
 /** One installed connector with its run state. */
 export interface DaziConnectorView {

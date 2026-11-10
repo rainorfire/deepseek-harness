@@ -109,6 +109,15 @@ export abstract class ReleaseFamily {
   abstract readonly tagPrefix: string
 
   /**
+   * Whether a manifest name belongs to this family.
+   * @param name - the manifest's package name.
+   * @returns true when the family may select it.
+   */
+  acceptsName(name: string): boolean {
+    return name.startsWith('@deepseek-ai/')
+  }
+
+  /**
    * Assert that built artifacts match this release family's required profile.
    * Families without environment-selected artifacts accept every build tree.
    * @param _root - repository root containing generated artifacts.
@@ -133,7 +142,9 @@ export abstract class ReleaseFamily {
       const name = requireString(manifest, 'name', normalized)
       const version = requireString(manifest, 'version', normalized)
       if (name === WORKSPACE_ROOT_PACKAGE) throw new Error(`${normalized} selected the workspace root`)
-      if (!name.startsWith('@deepseek-ai/')) throw new Error(`${normalized} must name an @deepseek-ai package`)
+      // This fork's own packages form the `dazi` family; every other family leaves them out.
+      if (name.startsWith('@dazi/') && !this.acceptsName(name)) continue
+      if (!this.acceptsName(name)) throw new Error(`${normalized} must name a package in this family's scope`)
       if (seen.has(name)) throw new Error(`${name} appears twice in release family ${this.id}`)
       seen.add(name)
       members.push({
@@ -418,6 +429,49 @@ class DshFamily extends ReleaseFamily {
   readonly installedEntry = { packageName: '@deepseek-ai/dsh', binPath: 'lib/bin.js' }
 }
 
+/** `packages/dazi/*`: this fork's own packages, published under the `@dazi/` scope. */
+class DaziFamily extends ReleaseFamily {
+  readonly id = 'dazi'
+  readonly patterns = ['packages/dazi/*/package.json'] as const
+  readonly tagPrefix = 'dazi-v'
+
+  override acceptsName(name: string): boolean {
+    return name.startsWith('@dazi/')
+  }
+
+  /**
+   * Accept one version across the family so a single tag can name it.
+   * @param members - this family's members.
+   */
+  verifyVersions(members: readonly ReleaseMember[]): void {
+    const versions = new Set(members.map(member => member.version))
+    if (versions.size !== 1) {
+      const detail = members.map(member => `${member.directory}: ${member.version}`).join('\n')
+      throw new Error(`dazi release members must share one version:\n${detail}`)
+    }
+  }
+
+  /**
+   * The family prefix: one version covers every member, so one tag names it.
+   * @returns `dazi-v`.
+   */
+  tagPrefixFor(): string {
+    return this.tagPrefix
+  }
+
+  /**
+   * Require a non-empty payload; the dazi packages ship built JavaScript only.
+   * @param member - the packed member.
+   * @param files - every path inside its tarball.
+   */
+  validatePayload(member: ReleaseMember, files: readonly string[]): void {
+    if (files.length === 0) throw new Error(`${member.name} packed an empty tarball`)
+  }
+
+  /** No installed-entry probe: these are bundles a profile loads, with no executable. */
+  readonly installedEntry = undefined
+}
+
 /** `vendor/*`: every package keeps its own version line, so every package has its own tag. */
 class VendorFamily extends ReleaseFamily {
   readonly id = 'vendor'
@@ -467,7 +521,7 @@ class VendorFamily extends ReleaseFamily {
 
 /** Every release family this module owns, in workflow order. */
 function releaseFamilies(): readonly ReleaseFamily[] {
-  return [new DshFamily(), new VendorFamily()]
+  return [new DshFamily(), new DaziFamily(), new VendorFamily()]
 }
 
 /**

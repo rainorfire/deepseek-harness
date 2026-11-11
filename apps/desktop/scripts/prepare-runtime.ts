@@ -19,12 +19,35 @@ const RUNTIME_ROOT = BUILD_PATHS.runtime
 
 type DesktopTarget = ReturnType<typeof desktopTargetPlatform>
 
+/**
+ * Read `DSH_DESKTOP_ELECTRON_CHECKSUMS` as `{ artifactName: sha256 }` for the requested Electron artifact.
+ * Set it only where the release checksum file is unreachable and the archive is already verified.
+ * @returns the checksum map, or undefined to download the release's own checksum file.
+ */
+function resolveElectronChecksums(
+  version: string, platform: NodeJS.Platform, arch: NodeJS.Architecture,
+): Record<string, string> | undefined {
+  const raw = process.env.DSH_DESKTOP_ELECTRON_CHECKSUMS
+  if (raw === undefined || raw.trim() === '') return undefined
+  const parsed: unknown = JSON.parse(raw)
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('DSH_DESKTOP_ELECTRON_CHECKSUMS must be a JSON object')
+  const file = `electron-v${version}-${platform === 'win32' ? 'win32' : platform}-${arch}.zip`
+  const entries = Object.fromEntries(Object.entries(parsed).filter(([, value]) => typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value)))
+  if (Object.keys(entries).length === 0) throw new Error('DSH_DESKTOP_ELECTRON_CHECKSUMS needs at least one artifact checksum')
+  const selected = entries[file]
+  return selected === undefined ? entries : { [file]: selected }
+}
+
 /** Extract the target Electron distribution and return its embedded Node version. */
 async function prepareElectron({ platform, arch }: DesktopTarget): Promise<string> {
   const require = createRequire(import.meta.url)
   const { version } = require('electron/package.json') as { version: string }
+  // A CI-provided checksum map lets the cache serve the archive without the
+  // release's SHASUMS256.txt, which GitHub's release host must be reachable for.
+  const checksums = resolveElectronChecksums(version, platform, arch)
   const archive = await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'download:electron',
-    () => downloadArtifact({ version, platform, arch, artifactName: 'electron', cacheRoot: BUILD_PATHS.downloads }))
+    () => downloadArtifact({ version, platform, arch, artifactName: 'electron', cacheRoot: BUILD_PATHS.downloads,
+      ...(checksums === undefined ? {} : { checksums }) }))
   rmSync(BUILD_PATHS.electron, { recursive: true, force: true })
   await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'extract:electron', () => extractZip(archive, { dir: BUILD_PATHS.electron }))
   const executable = join(BUILD_PATHS.electron, platform === 'win32' ? 'electron.exe' : 'Electron.app/Contents/MacOS/Electron')

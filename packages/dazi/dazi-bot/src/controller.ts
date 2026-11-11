@@ -14,7 +14,7 @@ import type { DaziConnectorView, DaziConnectorsHost } from './contract.js'
 export type {
   ConnectorCatalogRow, ConnectorExploration,
 } from './types.js'
-import type { ConnectorExploration } from './types.js'
+import type { ConnectorDraft, ConnectorExploration } from './types.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -85,5 +85,29 @@ export class DaziConnectorsController extends TypertRemoteService {
       const message = error instanceof Error ? error.message : String(error)
       throw new RemoteError('gateway/internal', `连接器 ${slug} 启动失败：${message}`, {}, { cause: error })
     }
+  }
+
+  /**
+   * Add a connector from the panel and start it.
+   * @param draft - name, transport, endpoint, and optional token.
+   * @returns the new connector's run state.
+   */
+  @Remote
+  async add(draft: ConnectorDraft): Promise<DaziConnectorView> {
+    try {
+      return await this.host.add(draft)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new RemoteError('gateway/bad-request', `新增连接器失败：${message}`, {}, { cause: error })
+    }
+  }
+
+  /**
+   * Remove a connector the panel created.
+   * @param slug - catalog slug.
+   */
+  @Remote
+  async remove(slug: string): Promise<void> {
+    await this.host.remove(slug)
   }
 }

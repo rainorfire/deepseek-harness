@@ -40,7 +40,8 @@
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
     "lib/typert.remote-client.d.ts",
-    "lib/client.js"
+    "lib/client.js",
+    "skills"
   ],
   "license": "MIT",
   "scripts": {

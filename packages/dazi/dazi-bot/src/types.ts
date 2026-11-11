@@ -23,13 +23,29 @@ export interface ConnectorCatalogRow {
   readonly lastError: string
 }
 
+/** One custom connector the user adds from the explore panel. */
+export interface ConnectorDraft {
+  /** Display name; its slug becomes the tool namespace. */
+  readonly name: string
+  /** `remote-mcp` for an HTTP endpoint, `local-mcp` for a stdio command. */
+  readonly kind: string
+  /** Remote endpoint URL, or the local server's executable. */
+  readonly endpoint: string
+  /** Additional arguments for a local server. */
+  readonly args: readonly string[]
+  /** Remote bearer token; stored in this home's credential store, never in the catalog. */
+  readonly token: string
+  /** One-line description. */
+  readonly description: string
+}
+
 /** Everything the explore panel renders in one read. */
 export interface ConnectorExploration {
   /** The connector catalog. */
   readonly catalog: readonly ConnectorCatalogRow[]
   /** Installed connectors with run state. */
   readonly installed: readonly DaziConnectorView[]
-  /** Why the WorkDazi control endpoint could not be reached. */
+  /** Why remote connectors cannot start, when they cannot. */
   readonly remoteError: string
   /** Whether WorkDazi's own connector state was found on this host. */
   readonly workdaziFound: boolean
@@ -80,4 +96,8 @@ export interface DaziConnectorsHost {
   list(): CatalogListing[]
   /** Start one installed connector now. */
   activate(slug: string): DaziConnectorView
+  /** Add a connector from the panel, persist it, and start it. */
+  add(draft: ConnectorDraft): Promise<DaziConnectorView>
+  /** Remove a connector the panel created. */
+  remove(slug: string): Promise<void>
 }

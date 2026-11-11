@@ -7,3 +7,30 @@
 - insert:
     - id: dazi-bot-connectors
       name: '@dazi/dsh-dazi-bot'
+
+# WorkDazi's skills travel with this package under `skills/`. The preset patch
+# layer addresses rows inside an agent preset by `id` within `config.plugins`;
+# it replaces this row's config, so both directories are listed here.
+- id: preset-standard
+  config:
+    id: standard
+    order: 1
+    plugins:
+      - id: persona
+        name: '@deepseek-ai/dsh-persona'
+        config:
+          prefix: You are a coding agent powered by the {{model}} model.
+      - id: skill-filesystem
+        name: '@deepseek-ai/dsh-skill-filesystem'
+        config:
+          customSkillDirs:
+            - !!js >-
+              process.getBuiltinModule('node:path').join(
+                process.getBuiltinModule('node:path').dirname(
+                  process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@dazi/dsh-dazi-bot/package.json')),
+                'skills')
+            - !!js >-
+              process.getBuiltinModule('node:path').join(
+                process.getBuiltinModule('node:path').dirname(
+                  process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('@deepseek-ai/dsh-agent-preset/package.json')),
+                'skills')

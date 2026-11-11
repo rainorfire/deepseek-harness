@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { HeroFrameOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SidebarPanelIconOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type { ConnectorDraft } from '../../types.js'
 import type { ExploreCopy, ExploreSnapshot } from '../ExplorePanel.js'
 import { ExplorePanel } from '../ExplorePanel.js'
 import { DaziBrandMark, DaziBrandName, DaziHeroMark } from '../Brand.js'
@@ -32,6 +33,25 @@ const copy: ExploreCopy = {
   activate: '启用',
   running: '运行中',
   stopped: '未运行',
+  add: '新增连接器',
+  addTitle: '新增连接器',
+  name: '名称',
+  kind: '类型',
+  remote: '远程 MCP（HTTP）',
+  local: '本地 MCP（命令）',
+  endpoint: '服务 URL',
+  endpointHint: 'MCP 服务的 Streamable HTTP 端点',
+  command: '启动命令',
+  commandHint: '可执行文件，例如 npx、uvx 或脚本路径',
+  args: '参数',
+  argsHint: '以空格分隔，例如 -y @modelcontextprotocol/server-filesystem /tmp',
+  token: '访问令牌（可选）',
+  tokenHint: '作为 Authorization: Bearer 发送，保存在本机凭据存储中',
+  description: '描述（可选）',
+  save: '添加并启用',
+  cancel: '取消',
+  remove: '删除',
+  removing: '删除中…',
 }
 
 /** Sidebar label. */
@@ -45,11 +65,13 @@ const CONTROLS = 'button, a, input, textarea, select, label, [contenteditable], 
  * @param props - copy plus the reader and activator.
  * @returns the explore page.
  */
-function ExploreMain({ copy: panelCopy, explore, activate }: { readonly copy: ExploreCopy } & {
+function ExploreMain({ copy: panelCopy, explore, activate, add, remove }: { readonly copy: ExploreCopy } & {
   readonly explore: () => Promise<ExploreSnapshot>
   readonly activate: (slug: string) => Promise<void>
+  readonly add: (draft: ConnectorDraft) => Promise<void>
+  readonly remove: (slug: string) => Promise<void>
 }) {
-  return <ExplorePanel copy={panelCopy} explore={explore} activate={activate} />
+  return <ExplorePanel copy={panelCopy} explore={explore} activate={activate} add={add} remove={remove} />
 }
 
 /**
@@ -101,6 +123,14 @@ export function apply(ctx: ClientContext): void {
     const result = await ctx.remote.daziConnectors.activate(slug)
     if (!result.ok) throw new Error(result.error.message)
   }
+  const add = async (draft: ConnectorDraft): Promise<void> => {
+    const result = await ctx.remote.daziConnectors.add(draft)
+    if (!result.ok) throw new Error(result.error.message)
+  }
+  const remove = async (slug: string): Promise<void> => {
+    const result = await ctx.remote.daziConnectors.remove(slug)
+    if (!result.ok) throw new Error(result.error.message)
+  }
   const mainCopy: ExploreCopy = copy
   ctx.effect(() => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist',
@@ -111,7 +141,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main',
     key: PANEL_ID,
-    inject: () => ({ copy: mainCopy, explore, activate }),
+    inject: () => ({ copy: mainCopy, explore, activate, add, remove }),
   }, ExploreMain)), 'dazi-bot: explore panel')
   ctx.effect(() => ctx.slots.inject('conversation.hero.frame', () => ctx.slots.register({
     name: 'conversation.hero.frame',

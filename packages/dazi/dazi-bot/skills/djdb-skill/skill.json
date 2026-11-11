@@ -1,0 +1,16 @@
+{
+  "slug": "DjDB-skill",
+  "name": "到家数据库查询技能",
+  "description": "DjDB-skill 是一个面向到家业务开发人员的数据库查询技能，通过跳板机（jzdjs.djdns.cn）自动完成 MFA 认证和 SSH 登录，连接到 MySQL 从库执行 SQL 查询。所有查询在从库上执行，不影响主库数据。使用文档：https://ywwlaii6ga7.feishu.cn/wiki/RFs8weEjRi26khkEe2TcE88unSd",
+  "version": "0.3.0",
+  "categories": ["automation", "devops", "infrastructure"],
+  "author": "fenghn",
+  "keywords": ["到家数据库", "数据库查询"],
+  "platforms": ["openclaw", "codex", "claudecode", "opencode"],
+  "runtime": "npm",
+  "changelog": "v0.1.0: 配置从环境变量改为 ~/.config/djs.config 文件读取，解决非交互式 shell 无法加载 ~/.bashrc 的问题\nv0.2.0: 从库只允许查询操作，写操作直接拒绝\nv0.3.0: 增大 tmux history-limit 50000 防止大结果集截断；统一用 output.sh 获取结果，截断时用 capture-pane -S -5000 兜底；去掉不适用的 tee 模式",
+  "repository": {
+    "type": "gitlab",
+    "url": "git@git.daojia-inc.com:jz-strategy/daojia-dw-skill.git"
+  }
+}

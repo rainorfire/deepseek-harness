@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "obsidian": {
+      "name": "Obsidian",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=obsidian",
+      "source": "community",
+      "version": "1.0.0",
+      "installedAt": "2026-06-09T08:29:26Z"
+    }
+  }
+}

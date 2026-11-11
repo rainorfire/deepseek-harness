@@ -16,9 +16,10 @@
  * @module @dazi/dsh-dazi-bot/connectors
  */
 
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 
 /** WorkDazi's shared state directory. */
 export const DAZI_HOME = join(homedir(), '.dazi')
@@ -224,6 +225,8 @@ export function readCatalog(path = DEFAULT_CATALOG_PATH, storePath = DAZI_STORE_
   }
   const custom = readConnectorSettings(storePath)?.customCatalog
   if (Array.isArray(custom)) items.push(...custom)
+  // Entries this package writes live in the file's own `custom` list.
+  if (isObject(raw) && Array.isArray(raw.custom)) items.push(...raw.custom)
   const seen = new Set<string>()
   return items.flatMap((value) => {
     const item = toCatalogItem(value)
@@ -288,4 +291,95 @@ export function listCatalog(instances: readonly StoredInstance[], catalog: reado
 /** Expand a leading `~` to the home directory. */
 export function expandHome(command: string): string {
   return command.replace(/^~(?=\/|$)/, homedir())
+}
+
+/** Derive a stable kebab-case slug the tool namespace can carry. */
+export function slugFor(name: string): string {
+  const ascii = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  return ascii === '' ? `connector-${Date.now().toString(36)}` : ascii
+}
+
+/** Catalog file shape as dazi-bot writes it: categories of items plus its own custom entries. */
+interface CatalogFile {
+  categories?: { category: string; items: CatalogItem[] }[]
+  custom?: CatalogItem[]
+}
+
+/** Write JSON atomically so a crash never leaves a half-written store. */
+function writeJson(path: string, value: unknown): void {
+  mkdirSync(dirname(path), { recursive: true })
+  const temporary = `${path}.${randomUUID()}`
+  writeFileSync(temporary, `${JSON.stringify(value, undefined, 2)}\n`, 'utf-8')
+  renameSync(temporary, path)
+}
+
+/** Raw store object, created on first write. */
+function readStore(storePath = DAZI_STORE_PATH): Json {
+  const raw = readJson(storePath)
+  return isObject(raw) ? raw : {}
+}
+
+/**
+ * Add a custom connector to the catalog and install it.
+ * @param draft - name, kind, endpoint, and optional token.
+ * @param storePath - store file to write.
+ * @param catalogPath - catalog file to extend.
+ * @returns the new catalog entry.
+ */
+export function addConnector(
+  draft: { name: string; kind: string; endpoint: string; args: readonly string[]; token: string; description: string },
+  storePath = DAZI_STORE_PATH, catalogPath = DEFAULT_CATALOG_PATH,
+): CatalogItem {
+  const name = draft.name.trim()
+  const endpoint = draft.endpoint.trim()
+  if (name === '') throw new Error('名称不能为空')
+  if (endpoint === '') throw new Error(draft.kind === 'remote-mcp' ? '服务 URL 不能为空' : '启动命令不能为空')
+  if (draft.kind !== 'remote-mcp' && draft.kind !== 'local-mcp') throw new Error(`不支持的连接器类型：${draft.kind}`)
+  if (draft.kind === 'remote-mcp' && !/^https?:\/\//i.test(endpoint)) throw new Error('MCP 服务 URL 需以 http(s):// 开头')
+  const existing = readCatalog(catalogPath, storePath)
+  const base = slugFor(name)
+  let slug = base
+  for (let index = 2; existing.some(item => item.slug === slug); index += 1) slug = `${base}-${String(index)}`
+  const item: CatalogItem = {
+    slug,
+    name,
+    description: draft.description.trim() === '' ? (draft.kind === 'remote-mcp' ? '自定义 MCP 服务' : '自定义本地 MCP') : draft.description.trim(),
+    category: '自定义',
+    source: 'custom',
+    auth: { type: 'none' },
+    transport: draft.kind === 'remote-mcp'
+      ? { kind: 'remote-mcp', url: endpoint }
+      : { kind: 'local-mcp', command: endpoint, args: [...draft.args] },
+  }
+  const file = (readJson(catalogPath) as CatalogFile | undefined) ?? {}
+  const categories = Array.isArray(file.categories) ? file.categories : []
+  const custom = Array.isArray(file.custom) ? file.custom : []
+  writeJson(catalogPath, { ...file, categories, custom: [...custom, item] })
+
+  const store = readStore(storePath)
+  const section = isObject(store.connectors) ? store.connectors : store
+  const instances = Array.isArray(section.instances) ? section.instances : []
+  const now = Date.now()
+  const instance = { id: randomUUID(), slug, displayName: name, state: 'ready', defaultEnabled: true, createdAt: now, updatedAt: now }
+  const next = { ...section, instances: [...instances, instance] }
+  writeJson(storePath, isObject(store.connectors) ? { ...store, connectors: next } : next)
+  return item
+}
+
+/**
+ * Remove a custom connector and its instance.
+ * @param slug - catalog slug.
+ * @param storePath - store file.
+ * @param catalogPath - catalog file.
+ */
+export function removeConnector(slug: string, storePath = DAZI_STORE_PATH, catalogPath = DEFAULT_CATALOG_PATH): void {
+  const file = (readJson(catalogPath) as CatalogFile | undefined) ?? {}
+  const custom = (Array.isArray(file.custom) ? file.custom : []).filter(item => item.slug !== slug)
+  writeJson(catalogPath, { ...file, custom })
+  const store = readStore(storePath)
+  const section = isObject(store.connectors) ? store.connectors : store
+  const instances = (Array.isArray(section.instances) ? section.instances : [])
+    .filter(instance => !isObject(instance) || instance.slug !== slug)
+  const next = { ...section, instances }
+  writeJson(storePath, isObject(store.connectors) ? { ...store, connectors: next } : next)
 }

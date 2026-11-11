@@ -1,0 +1,35 @@
+{
+    "files": [
+        {
+            "name": "common.md",
+            "url": "https://static.daojia.com/jz/assets/admin-publisher/baas/6a794aa7103bac5b6d641ab8/create-ebao-skill/references/common.md",
+            "description": "公共规则，必须首先加载"
+        },
+        {
+            "name": "bu_api_map.md",
+            "url": "https://static.daojia.com/jz/assets/admin-publisher/baas/6a794aa7103bac5b6d641ab8/create-ebao-skill/references/bu_api_map.md",
+            "description": "家政系统能力 API 地图"
+        },
+        {
+            "name": "ebao_skill_template.md",
+            "url": "https://static.daojia.com/jz/assets/admin-publisher/baas/6a794aa7103bac5b6d641ab8/create-ebao-skill/references/ebao_skill_template.md",
+            "description": "创建技能的 SKILL.md 模板"
+        },
+        {
+            "name": "python_rules.md",
+            "url": "https://static.daojia.com/jz/assets/admin-publisher/baas/6a794aa7103bac5b6d641ab8/create-ebao-skill/references/python_rules.md",
+            "description": "python 脚本生成规则与限制"
+        },
+        {
+            "name": "card_rules.md",
+            "url": "https://static.daojia.com/jz/assets/admin-publisher/baas/6a794aa7103bac5b6d641ab8/create-ebao-skill/references/card_rules.md",
+            "description": "卡片规则"
+        },
+        {
+            "name": "api_doc_template.md",
+            "url": "https://static.daojia.com/jz/assets/admin-publisher/baas/6a794aa7103bac5b6d641ab8/create-ebao-skill/references/api_doc_template.md",
+            "description": "接口文档模板"
+        }
+    ],
+    "version": "0.0.4"
+}

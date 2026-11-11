@@ -29,12 +29,13 @@ import Schema from '@deepseek-ai/schemastery'
 import { DaziConnectorsController } from './controller.js'
 import {
   DAZI_STORE_PATH, DEFAULT_CATALOG_PATH,
-  expandHome, isEnabled, listCatalog,
-  readCatalog, readInstances, readSessionEnabledIds,
+  addConnector, expandHome, isEnabled, listCatalog,
+  readCatalog, readInstances, readSessionEnabledIds, removeConnector,
 } from './connectors.js'
 import type {
   CatalogItem, CatalogListing, EnabledRemoteInstance, StoredInstance,
 } from './connectors.js'
+import type { ConnectorDraft } from './types.js'
 
 export type {
   CatalogItem, CatalogListing, ConnectorTransport, StoredInstance,
@@ -248,12 +249,38 @@ export function apply(ctx: Context, config: Config): void {
     }
   }
 
+  /** Add a connector from the panel and start it immediately. */
+  async function add(draft: ConnectorDraft): Promise<DaziConnectorView> {
+    const item = addConnector(draft, config.storePath, config.catalogPath)
+    catalog.push(item)
+    if (draft.token.trim() !== '') {
+      await ctx.credentials.set(credentialRef(`dazi_bot_connector_${item.slug.replace(/[^A-Za-z0-9_]/g, '_')}`), draft.token.trim())
+    }
+    await refreshRemote()
+    return describe().find(connector => connector.slug === item.slug) ?? {
+      id: item.slug, slug: item.slug, name: item.name, category: item.category ?? '',
+      kind: item.transport.kind, enabled: true, ready: false, reason: '启动中',
+    }
+  }
+
+  /** Remove a connector the panel created. */
+  async function remove(slug: string): Promise<void> {
+    disposers.get(slug)?.()
+    disposers.delete(slug)
+    removeConnector(slug, config.storePath, config.catalogPath)
+    const index = catalog.findIndex(item => item.slug === slug)
+    if (index >= 0) catalog.splice(index, 1)
+    await ctx.credentials.unset(credentialRef(`dazi_bot_connector_${slug.replace(/[^A-Za-z0-9_]/g, '_')}`)).catch(() => {})
+  }
+
   const host: DaziConnectorsHost = {
     refresh: async () => { await refreshRemote() },
     catalog: () => catalog,
     describe,
     list,
     activate,
+    add,
+    remove,
   }
 
   void ctx.plugin(DaziConnectorsController, host)

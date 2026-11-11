@@ -429,7 +429,7 @@ class DshFamily extends ReleaseFamily {
   readonly installedEntry = { packageName: '@deepseek-ai/dsh', binPath: 'lib/bin.js' }
 }
 
-/** `packages/dazi/*`: this fork's own packages, published under the `@dazi/` scope. */
+/** `packages/dazi/*`: this fork's own packages, versioned independently of the runtime. */
 class DaziFamily extends ReleaseFamily {
   readonly id = 'dazi'
   readonly patterns = ['packages/dazi/*/package.json'] as const

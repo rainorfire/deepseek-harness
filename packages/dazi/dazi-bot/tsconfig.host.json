@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": ["src"],
+  "exclude": ["src/client"],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../typert/protocol" },
+    { "path": "../../mcp/mcp-manager" }
+  ]
+}

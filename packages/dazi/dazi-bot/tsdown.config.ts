@@ -1,18 +1,25 @@
 /**
- * Build the dazi-bot bundle as a self-contained npm package: plain ESM with
- * declarations, no project references, so the packaged tarball needs only
- * Cordis and the MCP manager from the host it is installed into.
+ * Build the dazi-bot package on the workspace's Client face: the shared client
+ * preset emits the browser half as a client-module row while the Host face
+ * builds the plugin modules from `lib/types`. A plain build outside the
+ * workspace face emits only those Host modules.
  */
+import { clientBundle } from '../../client/tsdown.client.ts'
 import { defineConfig } from 'tsdown'
 
-/** One build per entry, so each module lands at `<name>.js` beside its declarations. */
-export default defineConfig(['index', 'connectors'].map(name => ({
-  entry: [`${name}.ts`],
-  outDir: '.',
-  format: 'esm' as const,
-  platform: 'node' as const,
-  dts: { sourcemap: false },
-  clean: false,
-  fixedExtension: false,
-  external: [/^@deepseek-ai\//, /^node:/],
-})))
+const workspace = clientBundle(import.meta.dirname, ['lib/types/index.js'])
+
+export default defineConfig((context) => {
+  if (context.env?.DSH_BUILD_FACE === 'client') return workspace(context)
+  return {
+    entry: ['lib/types/index.js'],
+    outDir: 'lib',
+    format: 'esm',
+    platform: 'node',
+    dts: false,
+    clean: false,
+    sourcemap: false,
+    fixedExtension: false,
+    external: [/^@deepseek-ai\//, /^@dazi\//, /^node:/],
+  }
+})

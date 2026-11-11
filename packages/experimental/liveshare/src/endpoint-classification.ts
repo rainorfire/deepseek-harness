@@ -220,6 +220,10 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'agentPresets/select': 'owner-only', // owner agent presets
   'agentTeams/setEnabled': 'owner-only', // owner Team mode
   'schedule/catalog': 'owner-only', // owner schedules
+  // The connector panel reads local WorkDazi state and starts local servers for the operating user only.
+  'daziConnectors/activate': 'owner-only',
+  'daziConnectors/explore': 'owner-only',
+  'daziConnectors/refresh': 'owner-only',
   'schedule/create': 'owner-only', // owner schedules
   'schedule/deliveryLimits': 'owner-only', // owner schedules
   'schedule/deleteInactive': 'owner-only', // owner schedules

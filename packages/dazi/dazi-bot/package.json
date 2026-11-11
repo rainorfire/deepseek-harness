@@ -1,34 +1,56 @@
 {
   "name": "@dazi/dsh-dazi-bot",
   "description": "dazi-bot bundle: registers the connectors installed for WorkDazi as MCP servers in a dsh profile",
-  "version": "0.2.2-rc.1-dazi.1",
+  "version": "0.2.2-rc.1",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "default": "./index.js"
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./src/*": "./src/*",
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./state": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": "./lib/client.js",
+    "./assets/*": "./lib/assets/*"
   },
   "files": [
-    "index.js",
-    "index.d.ts",
-    "connectors.js",
-    "connectors.d.ts",
+    "lib/**/*",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "lib/assets/**/*",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts",
+    "lib/client.js"
   ],
   "license": "MIT",
   "scripts": {
-    "build": "tsdown --config-loader native"
+    "bundle": "tsdown --config-loader native",
+    "build": "tsc -b"
   },
   "dsh": {
+    "client": {
+      "platform": "web"
+    },
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
@@ -38,6 +60,20 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
-    "@deepseek-ai/dsh-mcp-manager": "workspace:*"
+    "@deepseek-ai/dsh-mcp-manager": "workspace:*",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
+    "@deepseek-ai/dsh-api-remotes": "workspace:*"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-api-remotes": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-conversation": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-layout": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-renderer": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-sidebar": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-slots": "workspace:*",
+    "@deepseek-ai/dsh-mcp-manager": "workspace:*",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
+    "react": "^18.2.0"
   }
 }

@@ -1,6 +1,45 @@
-# dazi-bot bundle patch: registers the connectors installed for WorkDazi as
-# MCP servers in the host's mcp-manager. The mcp-manager row comes from
-# dsh-web-app, so list this bundle after it in the profile.
+# dazi-bot bundle patch: the connector plugin and the Magpie gateway as the
+# model route.
+#
+# Magpie speaks the Anthropic Messages API at https://sublink.daojia-inc.com/
+# (`POST /v1/messages`, `GET /v1/models`); its credential rides the `x-api-key`
+# header, which pi-ai sends for this protocol. The key resolves through
+# `apiKeyEnv`, so it lives in the harness credential store or the inherited
+# environment and never in this file.
+#
+# The mcp-manager row comes from dsh-web-app, so list this bundle after it.
 - insert:
     - id: dazi-bot-connectors
       name: '@dazi/dsh-dazi-bot'
+      inject: [mcpManager]
+
+# This patch replaces the whole `llm-pi-ai` row, including `providers`. The
+# plugin ships `providers` volatile and writes user edits from the Models page
+# into the profile's own patch, which applies after this layer.
+- id: llm-pi-ai
+  config:
+    providers:
+      magpie:
+        displayName: Magpie
+        api: anthropic-messages
+        baseURL: https://sublink.daojia-inc.com/
+        apiKeyEnv: ANTHROPIC_AUTH_TOKEN
+        models:
+          - id: glm-5.3
+            name: GLM 5.3
+          - id: glm-5.2
+            name: GLM 5.2
+          - id: deepseek-v4-pro
+            name: DeepSeek V4 Pro
+          - id: deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash
+          - id: kimi-k2.7-code
+            name: Kimi K2.7 Code
+          - id: kimi-k2.5
+            name: Kimi K2.5
+          - id: qwen3.8-max
+            name: Qwen3.8 Max
+          - id: MiniMax-M2.5
+            name: MiniMax M2.5
+        defaultContextWindow: 200000
+        defaultMaxTokens: 64000

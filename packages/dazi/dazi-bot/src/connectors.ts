@@ -54,6 +54,8 @@ export interface CatalogItem {
   applyHint?: string
   /** Kernel-direct exposure limits the catalog may declare; applied as `enabledTools`. */
   codexDirect?: { startupTimeoutSec?: number; enabledTools?: string[] }
+  /** Bundled skill names the catalog attaches, shown in the explore panel. */
+  skill?: string
 }
 
 /** One connector installed through WorkDazi. */
@@ -195,6 +197,7 @@ function toCatalogItem(value: unknown): CatalogItem | undefined {
     ...Array.isArray(value.examples) ? { examples: value.examples.filter((example): example is string => typeof example === 'string') } : {},
     ...typeof value.applyUrl === 'string' ? { applyUrl: value.applyUrl } : {},
     ...typeof value.applyHint === 'string' ? { applyHint: value.applyHint } : {},
+    ...Array.isArray(value.skills) && typeof value.skills[0] === 'string' ? { skill: value.skills[0] } : {},
     ...isObject(value.codexDirect) ? {
       codexDirect: {
         ...typeof value.codexDirect.startupTimeoutSec === 'number' ? { startupTimeoutSec: value.codexDirect.startupTimeoutSec } : {},

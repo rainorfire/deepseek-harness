@@ -25,6 +25,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { McpServerRegistration } from '@deepseek-ai/dsh-mcp-manager'
 import type {} from '@deepseek-ai/dsh-mcp-manager'
 import Schema from '@deepseek-ai/schemastery'
+import { DaziConnectorsController } from './controller.js'
 import {
   DAZI_STORE_PATH, DEFAULT_CATALOG_PATH, GATEWAY_PATH,
   expandHome, fetchEnabledRemoteInstances, isEnabled, listCatalog,
@@ -38,33 +39,8 @@ export type {
   CatalogItem, CatalogListing, ConnectorTransport, StoredInstance,
 } from './connectors.js'
 
-/** One installed connector with its run state. */
-export interface DaziConnectorView {
-  /** Instance id; unique across installed connectors. */
-  id: string
-  /** Catalog slug; also the tool namespace, `mcp__<slug>__<tool>`. */
-  slug: string
-  /** Display name. */
-  name: string
-  /** Catalog category. */
-  category: string
-  /** Transport kind of the catalog entry. */
-  kind: 'remote-mcp' | 'cli-bridge' | 'local-mcp'
-  /** Whether the installed instance is enabled in WorkDazi. */
-  enabled: boolean
-  /** Whether this host runs the connector. */
-  ready: boolean
-  /** Why the connector is not running, when it is not. */
-  reason?: string
-}
-
-/** Snapshot returned to clients. */
-export interface DaziConnectorsView {
-  /** Installed connectors with run state. */
-  installed: DaziConnectorView[]
-  /** Why remote connectors cannot start, when they cannot. */
-  remoteError?: string
-}
+export type { DaziConnectorView, DaziConnectorsView, DaziConnectorsHost } from './contract.js'
+import type { DaziConnectorView, DaziConnectorsHost } from './contract.js'
 
 /** Plugin configuration. */
 export interface Config {
@@ -252,7 +228,7 @@ export function apply(ctx: Context, config: Config): void {
         kind: item.transport.kind,
         enabled: isEnabled,
         ready: running,
-        ...reason === undefined ? {} : { reason },
+        reason: reason ?? '',
       }]
     })
   }
@@ -262,23 +238,33 @@ export function apply(ctx: Context, config: Config): void {
     return listCatalog(readInstances(config.storePath), catalog)
   }
 
-  /** Re-read remote credentials and reconcile, then report the current view. */
-  async function refresh(): Promise<CatalogListing[]> {
-    await refreshRemote()
-    ctx.emit('dazi-bot/connectors-changed')
-    return view()
+  /** Start the connector now without waiting for a host restart. */
+  function activate(slug: string): DaziConnectorView {
+    const instance = readInstances(config.storePath).find(candidate => candidate.slug === slug)
+    const item = catalog.find(candidate => candidate.slug === slug)
+    if (instance === undefined || item === undefined) throw new Error(`没有名为 ${slug} 的已安装连接器`)
+    const ids = sessionEnabledIds()
+    const entry = enabled(instance, ids) ? registration(item, instance) : undefined
+    if (entry === undefined) throw new Error(reasonFor(item, instance, enabled(instance, ids)) ?? `无法启动 ${slug}`)
+    disposers.get(slug)?.()
+    disposers.set(slug, ctx.mcpManager.register(slug, entry))
+    return describe().find(connector => connector.slug === slug) ?? {
+      id: instance.id, slug, name: instance.displayName ?? item.name, category: item.category ?? '',
+      kind: item.transport.kind, enabled: true, ready: true, reason: '',
+    }
   }
 
-  /** Catalog with install state. */
-  function view(): CatalogListing[] {
-    return list()
+  const host: DaziConnectorsHost = {
+    refresh: async () => { await refreshRemote() },
+    catalog: () => catalog,
+    describe,
+    list,
+    activate,
+    remoteError: () => remoteError,
+    controlUrl: () => readGateway(config.gatewayPath)?.controlUrl,
   }
 
-  // The view is built on demand for clients; keep refresh and list allocated so
-  // enabling them in the Remote surface does not change plugin behavior.
-  void describe
-  void view
-  void refresh
+  void ctx.plugin(DaziConnectorsController, host)
   ctx.effect(() => {
     void refreshRemote()
     const off = ctx.on('mcp-manager/status', (serverName, status) => {

@@ -1,0 +1,22 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "jsx": "react-jsx",
+    "allowJs": true
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../client/ui-layout" },
+    { "path": "../../client/ui-slots" },
+    { "path": "../../client/ui-primitives" },
+    { "path": "../../client/ui-sidebar" },
+    { "path": "../../client/ui-conversation/tsconfig.client.json" },
+    { "path": "../../client/ui-renderer" },
+    { "path": "./tsconfig.host.json" }
+  ]
+}

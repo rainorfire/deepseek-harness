@@ -33,6 +33,10 @@ import workspaceRemote from '@deepseek-ai/dsh-api-workspace-controller/remote'
 import terminalRemote from '@deepseek-ai/dsh-api-terminal-controller/remote'
 import workspaceFilesRemote from '@deepseek-ai/dsh-api-workspace-files/remote'
 import webRemote from '@deepseek-ai/dsh-web/remote'
+import daziConnectorsRemote from '@dazi/dsh-dazi-bot/remote'
+export type {} from '@dazi/dsh-dazi-bot/remote'
+// The connector types cross the client boundary from the package's type subpath, which the client build keeps type-only.
+export type {} from '@dazi/dsh-dazi-bot/state'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 
 export type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
@@ -204,7 +208,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       messageFeedbackRemote, sessionFeedbackRemote,
       fileUploadsRemote, sessionReferencesRemote,
       permissionPresetsRemote, subagentsRemote, sessionRemote, jobRemote, workspaceRemote, workspaceFilesRemote, terminalRemote,
-      officeToPdfRemote, userQuestionsRemote, webRemote,
+      officeToPdfRemote, userQuestionsRemote, webRemote, daziConnectorsRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

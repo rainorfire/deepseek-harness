@@ -23,8 +23,8 @@ async function main(): Promise<void> {
   const destination = resolve(root, values.out)
   const packed = await packFamilyMembers(root, releaseFamily('dsh'), destination, concurrency)
   // This fork's own packages ship beside the runtime so a bundled profile can list them.
-  const dazi = await packFamilyMembers(root, releaseFamily('dazi'), destination, concurrency === 1 ? 1 : 2, { keepDestination: true })
-  console.log(`desktop local pack: ${String(packed.length)} tarball(s) in ${destination}`)
+  const own = await packFamilyMembers(root, releaseFamily('dazi'), destination, concurrency === 1 ? 1 : 2, { keepDestination: true })
+  console.log(`desktop local pack: ${String(packed.length + own.length)} tarball(s) in ${destination}`)
 }
 
 await main()

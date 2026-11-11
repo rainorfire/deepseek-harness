@@ -120,8 +120,12 @@ function readSettings(path = DAZI_STORE_PATH): Json | undefined {
 
 /** The `connectors` section of dazi-bot's connector settings. */
 function readConnectorSettings(path = DAZI_STORE_PATH): Json | undefined {
-  const connectors = readSettings(path)?.connectors
-  return isObject(connectors) ? connectors : undefined
+  const settings = readSettings(path)
+  if (settings === undefined) return undefined
+  // The file holds the connector section at its root; a file that wraps it in
+  // `connectors` (the shape WorkDazi's own store used) reads the same way.
+  const connectors = isObject(settings.connectors) ? settings.connectors : settings
+  return connectors
 }
 
 /** Read the control endpoint recorded by the WorkDazi app. */

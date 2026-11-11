@@ -1,17 +1,12 @@
-# dazi-bot bundle patch: the connector plugin and the Magpie gateway as the
-# model route.
-#
-# Magpie speaks the Anthropic Messages API at https://sublink.daojia-inc.com/
-# (`POST /v1/messages`, `GET /v1/models`); its credential rides the `x-api-key`
-# header, which pi-ai sends for this protocol. The key resolves through
-# `apiKeyEnv`, so it lives in the harness credential store or the inherited
-# environment and never in this file.
+# dazi-bot bundle patch: the connector plugin, plus the Magpie gateway —
+# the local model router at 127.0.0.1:3425 — as the model routes and the
+# default selection. Credentials resolve through `apiKeyEnv`, so the key lives
+# in the harness credential store or the inherited environment, never here.
 #
 # The mcp-manager row comes from dsh-web-app, so list this bundle after it.
 - insert:
     - id: dazi-bot-connectors
       name: '@dazi/dsh-dazi-bot'
-      inject: [mcpManager]
 
 # This patch replaces the whole `llm-pi-ai` row, including `providers`. The
 # plugin ships `providers` volatile and writes user edits from the Models page
@@ -21,25 +16,228 @@
     providers:
       magpie:
         displayName: Magpie
-        api: anthropic-messages
-        baseURL: https://sublink.daojia-inc.com/
-        apiKeyEnv: ANTHROPIC_AUTH_TOKEN
+        apiKeyEnv: MAGPIE_GATEWAY_KEY
+        api: openai-completions
+        baseURL: http://127.0.0.1:3425/v1
         models:
-          - id: glm-5.3
-            name: GLM 5.3
-          - id: glm-5.2
-            name: GLM 5.2
-          - id: deepseek-v4-pro
-            name: DeepSeek V4 Pro
-          - id: deepseek-v4.1-flash
-            name: DeepSeek V4.1 Flash
-          - id: kimi-k2.7-code
-            name: Kimi K2.7 Code
-          - id: kimi-k2.5
-            name: Kimi K2.5
-          - id: qwen3.8-max
-            name: Qwen3.8 Max
-          - id: MiniMax-M2.5
-            name: MiniMax M2.5
-        defaultContextWindow: 200000
-        defaultMaxTokens: 64000
+          - id: group/cheap-first
+            name: 到家-便宜优先 · routing group
+            contextWindow: 1000000
+            maxTokens: 131072
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
+          - id: auto/minimax-m2.7
+            name: MiniMax-M2.7 · routing group
+            contextWindow: 204800
+            maxTokens: 51200
+            input: [text, image]
+          - id: kimi-code-cn/kimi-k3
+            name: Kimi K3 · 我的Kimi-Coding
+            contextWindow: 1048576
+            maxTokens: 131072
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
+          - id: kimi-code-cn/k3.1-pro
+            name: K3.1 Pro · 我的Kimi-Coding
+            contextWindow: 1048576
+            maxTokens: 131072
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
+          - id: kimi-code-cn/k3.1-pro-highspeed
+            name: K3.1 Pro Highspeed 2x Usage Cost · 我的Kimi-Coding
+            contextWindow: 1048576
+            maxTokens: 131072
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
+          - id: kimi-code-cn/kimi-for-coding
+            name: K2.8 Preview · 我的Kimi-Coding
+            contextWindow: 1048576
+            maxTokens: 32768
+            input: [text, image]
+            reasoningEfforts:
+              'off': none
+              low: low
+              high: high
+              max: max
+          - id: kimi-code-cn/k3
+            name: K3 · 我的Kimi-Coding
+            contextWindow: 1048576
+            maxTokens: 131072
+            input: [text, image]
+            reasoningEfforts:
+              'off': none
+              low: low
+              high: high
+              max: max
+          - id: kimi-code-cn/k3-256k
+            name: K3-256k · 我的Kimi-Coding
+            contextWindow: 262144
+            maxTokens: 65536
+            input: [text, image]
+            reasoningEfforts:
+              'off': none
+              low: low
+              high: high
+              max: max
+          - id: kimi-code-cn/kimi-for-coding-highspeed
+            name: K2.7 Code Highspeed · 我的Kimi-Coding
+            contextWindow: 262144
+            maxTokens: 32768
+            input: [text, image]
+          - id: minimax-cn/MiniMax-M2.7
+            name: MiniMax-M2.7 · 我的MiniMax2.7
+            contextWindow: 204800
+            maxTokens: 51200
+            input: [text, image]
+          - id: deepseek/deepseek-flash[1M]
+            name: DeepSeek V4.1 Flash [1M] · 我的DeepSeek
+            contextWindow: 1000000
+            maxTokens: 384000
+            input: [text, image]
+            reasoningEfforts:
+              'off': none
+              low: low
+              high: high
+              max: max
+          - id: deepseek/deepseek-flash
+            name: DeepSeek-V4.1-Flash · 我的DeepSeek
+            contextWindow: 1048576
+            maxTokens: 393216
+            input: [text, image]
+            reasoningEfforts:
+              'off': none
+              low: low
+              high: high
+              max: max
+          - id: zhipu/glm-5.1
+            name: GLM-5.1 · 我的GLM
+            contextWindow: 200000
+            maxTokens: 50000
+            input: [text, image]
+          - id: kimi-code-cn-2/k2p5
+            name: k2p5 · Kimi for Coding
+            input: [text, image]
+          - id: kimi-code-cn-2/k2p6
+            name: k2p6 · Kimi for Coding
+            input: [text, image]
+          - id: qwen2/qwen2:latest
+            name: qwen2:latest · qwen2
+            input: [text, image]
+        streamIdleTimeoutMs: 600000
+      magpie-anthropic:
+        displayName: Magpie · Anthropic
+        apiKeyEnv: MAGPIE_GATEWAY_KEY
+        api: anthropic-messages
+        baseURL: http://127.0.0.1:3425
+        models:
+          - id: djsublink/glm-5.2
+            name: GLM-5.2 · 到家模型网管（djsublink）
+            contextWindow: 1000000
+            maxTokens: 131072
+            input: [text, image]
+            reasoningEfforts:
+              high: high
+              max: max
+            compat:
+              forceAdaptiveThinking: true
+          - id: djsublink/deepseek-v4.1-flash
+            name: DeepSeek V4.1 Flash · 到家模型网管（djsublink）
+            contextWindow: 1048576
+            maxTokens: 384000
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
+          - id: djsublink-2/glm-5.3
+            name: GLM-5.3 · 到家模型网管-智谱组（djsublink）
+            contextWindow: 1000000
+            maxTokens: 131072
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
+            compat:
+              forceAdaptiveThinking: true
+          - id: djsublink-2/glm-5.3-flash
+            name: GLM-5.3-Flash · 到家模型网管-智谱组（djsublink）
+            contextWindow: 1048576
+            maxTokens: 131072
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
+            compat:
+              forceAdaptiveThinking: true
+          - id: minimax/MiniMax-M2.7
+            name: MiniMax-M2.7 · 我的MiniMax
+            contextWindow: 204800
+            maxTokens: 51200
+            input: [text, image]
+        streamIdleTimeoutMs: 600000
+      magpie-responses:
+        displayName: Magpie · Responses
+        apiKeyEnv: MAGPIE_GATEWAY_KEY
+        api: openai-responses
+        baseURL: http://127.0.0.1:3425/v1
+        models:
+          - id: codex/gpt-6-luna
+            name: GPT-6-Luna · Codex
+            contextWindow: 272000
+            maxTokens: 70464
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+            compat:
+              supportsStrictMode: true
+          - id: codex/gpt-5.6-terra
+            name: GPT-5.6-Terra · Codex
+            contextWindow: 272000
+            maxTokens: 70464
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+            compat:
+              supportsStrictMode: true
+          - id: codex/gpt-5.6-luna
+            name: GPT-5.6-Luna · Codex
+            contextWindow: 272000
+            maxTokens: 70464
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              medium: medium
+              high: high
+              xhigh: xhigh
+              max: max
+            compat:
+              supportsStrictMode: true
+        streamIdleTimeoutMs: 600000
+
+# Route Agents created without a session-specific selection at Magpie.
+- id: agent-default-model
+  config:
+    provider: magpie
+    model: deepseek/deepseek-flash

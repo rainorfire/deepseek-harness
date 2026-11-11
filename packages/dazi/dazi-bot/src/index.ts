@@ -166,17 +166,6 @@ export function apply(ctx: Context, config: Config): void {
       if (instance === undefined || item === undefined || !enabled(instance, ids)) {
         dispose()
         disposers.delete(slug)
-      } else if (item.transport.kind === 'remote-mcp') {
-        // The remote entry's credential or URL may have changed; mcp-manager rebuilds on any config change.
-        dispose()
-        disposers.delete(slug)
-        const entry = registration(item, instance)
-        if (entry === undefined) continue
-        try {
-          disposers.set(slug, ctx.mcpManager.register(slug, entry))
-        } catch (error) {
-          logger.warn('连接器 %s 重新注册失败：%s', slug, error instanceof Error ? error.message : String(error))
-        }
       }
     }
     for (const instance of instances) {

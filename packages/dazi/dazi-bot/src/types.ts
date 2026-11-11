@@ -80,8 +80,4 @@ export interface DaziConnectorsHost {
   list(): CatalogListing[]
   /** Start one installed connector now. */
   activate(slug: string): DaziConnectorView
-  /** Why remote connectors cannot start, when they cannot. */
-  remoteError(): string | undefined
-  /** WorkDazi control endpoint, when one is recorded. */
-  controlUrl(): string | undefined
 }

@@ -24,12 +24,13 @@ import { dirname } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { McpServerRegistration } from '@deepseek-ai/dsh-mcp-manager'
 import type {} from '@deepseek-ai/dsh-mcp-manager'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import Schema from '@deepseek-ai/schemastery'
 import { DaziConnectorsController } from './controller.js'
 import {
-  DAZI_STORE_PATH, DEFAULT_CATALOG_PATH, GATEWAY_PATH,
-  expandHome, fetchEnabledRemoteInstances, isEnabled, listCatalog,
-  readCatalog, readGateway, readInstances, readSessionEnabledIds,
+  DAZI_STORE_PATH, DEFAULT_CATALOG_PATH,
+  expandHome, isEnabled, listCatalog,
+  readCatalog, readInstances, readSessionEnabledIds,
 } from './connectors.js'
 import type {
   CatalogItem, CatalogListing, EnabledRemoteInstance, StoredInstance,
@@ -48,8 +49,6 @@ export interface Config {
   catalogPath?: string
   /** Path of WorkDazi's settings store. */
   storePath?: string
-  /** Path of the control endpoint descriptor. */
-  gatewayPath?: string
   /** Node executable for CLI bridges and local servers; defaults to the host's. */
   nodePath?: string
   /** Run every installed connector, whatever WorkDazi's enable switches say. */
@@ -57,12 +56,11 @@ export interface Config {
 }
 
 export const name = 'dazi-bot-connectors'
-export const inject = ['mcpManager']
+export const inject = ['mcpManager', 'credentials']
 
 export const Config: Schema<Config> = Schema.object({
   catalogPath: Schema.string().default(DEFAULT_CATALOG_PATH),
   storePath: Schema.string().default(DAZI_STORE_PATH),
-  gatewayPath: Schema.string().default(GATEWAY_PATH),
   nodePath: Schema.string().default(process.execPath),
   ignoreEnableState: Schema.boolean().default(false),
 })
@@ -87,8 +85,7 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   const disposers = new Map<string, () => void>()
-  let remoteInstances: readonly EnabledRemoteInstance[] = []
-  let remoteError: string | undefined
+  let remoteInstances: EnabledRemoteInstance[] = []
 
   /** Instance ids named by any session enable set in WorkDazi. */
   function sessionEnabledIds(): Set<string> {
@@ -141,11 +138,11 @@ export function apply(ctx: Context, config: Config): void {
 
   /** Why a connector is not running; undefined while it runs. */
   function reasonFor(item: CatalogItem, instance: StoredInstance, isEnabled: boolean): string | undefined {
-    if (instance.state !== undefined && instance.state !== 'ready') return `WorkDazi 中状态为 ${instance.state}`
-    if (!isEnabled) return '在 WorkDazi 中未启用'
+    if (instance.state !== undefined && instance.state !== 'ready') return `连接器状态为 ${instance.state}`
+    if (!isEnabled) return '未启用'
     switch (item.transport.kind) {
       case 'remote-mcp':
-        return remoteError
+        return remoteInstances.some(candidate => candidate.slug === instance.slug) ? undefined : '未配置凭据'
       case 'cli-bridge':
         return item.transport.bridge?.trim() ? undefined : '目录条目缺少启动命令'
       case 'local-mcp':
@@ -183,19 +180,27 @@ export function apply(ctx: Context, config: Config): void {
     }
   }
 
-  /** Re-read the control endpoint, then reconcile. */
+  /** Resolve a remote connector's credential from this home's own credential store. */
   async function refreshRemote(): Promise<void> {
     remoteInstances = []
-    remoteError = undefined
-    const gateway = readGateway(config.gatewayPath)
-    if (gateway === undefined) {
-      remoteError = '未找到 WorkDazi 连接器控制口（先启动 WorkDazi 应用）'
-    } else {
-      try {
-        remoteInstances = await fetchEnabledRemoteInstances(gateway)
-      } catch (error) {
-        remoteError = `WorkDazi 连接器控制口不可用：${error instanceof Error ? error.message : String(error)}`
+    const ids = sessionEnabledIds()
+    for (const instance of readInstances(config.storePath)) {
+      if (!enabled(instance, ids)) continue
+      const item = catalog.find(candidate => candidate.slug === instance.slug)
+      if (item?.transport.kind !== 'remote-mcp') continue
+      const ref = credentialRef(`dazi_bot_connector_${instance.slug.replace(/[^A-Za-z0-9_]/g, '_')}`)
+      const hit = await ctx.credentials.resolve(ref)
+      if (hit === undefined || hit.value.length === 0) {
+        logger.warn('远程连接器 %s 尚未配置凭据（%s）', instance.slug, ref)
+        continue
       }
+      remoteInstances.push({
+        id: instance.id,
+        slug: instance.slug,
+        url: item.transport.url,
+        ...item.transport.timeout === undefined ? {} : { timeoutMs: item.transport.timeout },
+        headers: { Authorization: `Bearer ${hit.value}` },
+      })
     }
     reconcile()
   }
@@ -249,8 +254,6 @@ export function apply(ctx: Context, config: Config): void {
     describe,
     list,
     activate,
-    remoteError: () => remoteError,
-    controlUrl: () => readGateway(config.gatewayPath)?.controlUrl,
   }
 
   void ctx.plugin(DaziConnectorsController, host)

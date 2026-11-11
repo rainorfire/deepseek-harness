@@ -26,11 +26,11 @@ export const DAZI_HOME = join(homedir(), '.dazi')
 /** Control endpoint descriptor written by the WorkDazi app. */
 export const GATEWAY_PATH = join(DAZI_HOME, 'connectors', 'gateway.json')
 
-/** WorkDazi's electron-store file, which holds settings and connector instances. */
-export const DAZI_STORE_PATH = join(homedir(), 'Library', 'Application Support', 'work-dazi', 'workdazi.json')
+/** dazi-bot's own connector state: instances, custom catalog entries, and per-session enable sets. */
+export const DAZI_STORE_PATH = join(homedir(), '.dazi-bot', 'connectors', 'instances.json')
 
-/** Connector catalog shipped inside the WorkDazi application. */
-export const DEFAULT_CATALOG_PATH = '/Applications/WorkDazi.app/Contents/Resources/connectors/catalog/index.json'
+/** Connector catalog copied into dazi-bot's home from WorkDazi's application resources. */
+export const DEFAULT_CATALOG_PATH = join(homedir(), '.dazi-bot', 'connectors', 'catalog', 'index.json')
 
 /** Transport a connector starts as an MCP server. */
 export type ConnectorTransport =
@@ -113,13 +113,12 @@ function stringRecord(value: unknown): Record<string, string> | undefined {
   return entries.length > 0 ? Object.fromEntries(entries) : undefined
 }
 
-/** Settings object from WorkDazi's store. */
+/** dazi-bot's own connector settings object. */
 function readSettings(path = DAZI_STORE_PATH): Json | undefined {
-  const store = readJson(path)
-  return isObject(store) && isObject(store.settings) ? store.settings : undefined
+  return readJson(path) as Json | undefined
 }
 
-/** The `connectors` section of WorkDazi's settings. */
+/** The `connectors` section of dazi-bot's connector settings. */
 function readConnectorSettings(path = DAZI_STORE_PATH): Json | undefined {
   const connectors = readSettings(path)?.connectors
   return isObject(connectors) ? connectors : undefined

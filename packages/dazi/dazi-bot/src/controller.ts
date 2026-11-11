@@ -56,7 +56,7 @@ export class DaziConnectorsController extends TypertRemoteService {
         lastError: installed.find(connector => connector.slug === item.slug)?.reason ?? '',
       })),
       installed,
-      remoteError: this.host.remoteError() ?? '',
+      remoteError: '',
       workdaziFound: this.host.catalog().length > 0,
     }
   }

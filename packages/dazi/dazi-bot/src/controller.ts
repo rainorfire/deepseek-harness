@@ -103,11 +103,12 @@ export class DaziConnectorsController extends TypertRemoteService {
   }
 
   /**
-   * Remove a connector the panel created.
+   * Remove a connector the panel created. Named apart from `remove`, which a
+   * Cordis service already defines and the namespace service must not shadow.
    * @param slug - catalog slug.
    */
   @Remote
-  async remove(slug: string): Promise<void> {
+  async uninstall(slug: string): Promise<void> {
     await this.host.remove(slug)
   }
 }

@@ -128,7 +128,7 @@ export function apply(ctx: ClientContext): void {
     if (!result.ok) throw new Error(result.error.message)
   }
   const remove = async (slug: string): Promise<void> => {
-    const result = await ctx.remote.daziConnectors.remove(slug)
+    const result = await ctx.remote.daziConnectors.uninstall(slug)
     if (!result.ok) throw new Error(result.error.message)
   }
   const mainCopy: ExploreCopy = copy

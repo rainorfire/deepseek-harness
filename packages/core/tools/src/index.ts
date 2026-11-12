@@ -367,6 +367,18 @@ export class ToolsService extends Service {
   }
 
   /**
+   * Read the executor this scope's chain selects, without requiring a selection
+   * to exist first. A wrapper that narrows a provider's output calls this before
+   * installing itself over it.
+   * @param scope - viewing Agent or preset; omitted selects the deployment default.
+   * @returns the selected executor.
+   * @throws {ToolExecutorUnavailableError} when no executor is selected in this chain.
+   */
+  currentExecutor(scope?: ScopeKey): ToolExecutor {
+    return this.selectExecutor(scope)
+  }
+
+  /**
    * Delegate a raw call batch to its Agent's provider or the deployment default.
    * Select at dispatch; accepted batches settle through that provider even if it unloads.
    * @param input - original calls, optional owning Agent, and optional logging step.

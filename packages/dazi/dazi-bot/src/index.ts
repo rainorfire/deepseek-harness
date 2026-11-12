@@ -26,6 +26,7 @@ import type { McpServerRegistration } from '@deepseek-ai/dsh-mcp-manager'
 import type {} from '@deepseek-ai/dsh-mcp-manager'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import Schema from '@deepseek-ai/schemastery'
+import { ConnectorToolSearch } from './tool-search.js'
 import { DaziConnectorsController } from './controller.js'
 import {
   DAZI_STORE_PATH, DEFAULT_CATALOG_PATH,
@@ -54,6 +55,12 @@ export interface Config {
   nodePath?: string
   /** Run every installed connector, whatever WorkDazi's enable switches say. */
   ignoreEnableState?: boolean
+  /**
+   * Hide connector tools behind `tool_search` instead of declaring every one of
+   * them in each request. Off declares them directly, which large connector sets
+   * rarely survive upstream schema limits.
+   */
+  searchableTools?: boolean
 }
 
 export const name = 'dazi-bot-connectors'
@@ -64,6 +71,7 @@ export const Config: Schema<Config> = Schema.object({
   storePath: Schema.string().default(DAZI_STORE_PATH),
   nodePath: Schema.string().default(process.execPath),
   ignoreEnableState: Schema.boolean().default(false),
+  searchableTools: Schema.boolean().default(true),
 })
 
 /** Screen and computer connectors legitimately run longer than a default tool call. */
@@ -284,6 +292,27 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   void ctx.plugin(DaziConnectorsController, host)
+
+  // Connector tools stay out of the model's declarations until `tool_search`
+  // returns them, or until a call guesses one name. The selection is logged per
+  // Session, so a resumed or forked conversation keeps what it exposed.
+  const searchable = config.searchableTools ?? true
+  if (searchable) {
+    void ctx.plugin(ConnectorToolSearch)
+    ctx.inject(['tools', 'connectorToolSearch'], (scope) => {
+      const search = scope.connectorToolSearch
+      const hideLinked = (): void => {
+        const registered = scope.tools.definitions().map(definition => definition.name)
+        for (const item of catalog) {
+          const prefix = `mcp__${item.slug}__`
+          search.hide(registered.filter(name => name.startsWith(prefix)), item.name)
+        }
+      }
+      const off = scope.on('tools/change', hideLinked)
+      hideLinked()
+      return off
+    })
+  }
   ctx.effect(() => {
     void refreshRemote()
     const off = ctx.on('mcp-manager/status', (serverName, status) => {

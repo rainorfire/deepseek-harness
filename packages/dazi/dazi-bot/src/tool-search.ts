@@ -9,19 +9,19 @@
  * agent's Session only. Calling a hidden tool by name also works — the guard
  * reveals it and asks for the call again.
  *
- * The selection is logged as `tool-search/expose` because the model-visible
- * tool set must be reconstructable from the Session log after a restart or fork.
+ * Nothing new is logged. The model-visible set is derived from what the log
+ * already records: a `tool_search` result lists the tools it revealed, and the
+ * guard's refusal names the tool a call tried. Both are ordinary tool results,
+ * so a harness without this package reads the Session unchanged.
  *
  * @module @dazi/dsh-dazi-bot/tool-search
  */
 
 import { Service, type Context } from '@deepseek-ai/cordis'
-import { z as zod } from 'zod'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { defineTool, projectToolSchema } from '@deepseek-ai/dsh-tools'
 import type { ToolModelInput } from '@deepseek-ai/dsh-tools'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import type { ProjectionDefinition, ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 
 /** Name of the search tool this module owns. */
 export const TOOL_SEARCH_NAME = 'tool_search'
@@ -33,57 +33,8 @@ const MAX_MATCHES = 8
 const MATCH_DESCRIPTION_CHARS = 400
 const MATCH_SCHEMA_CHARS = 2400
 
-/** Selection of connector tools for one Session. */
-export interface ToolSearchState {
-  /** Tool names exposed to the agent, in exposure order. */
-  exposed: string[]
-}
-
-declare module '@deepseek-ai/dsh-session/types' {
-  interface SessionEventMap {
-    /**
-     * Connector tools now visible to this Session's agent: log-only and
-     * cumulative. Names are tool names as the model sees them.
-     */
-    'tool-search/expose': { tools: string[] }
-  }
-}
-
-declare module '@deepseek-ai/dsh-session-projection/types' {
-  interface SessionProjectionMap {
-    /** Connector tools this Session's agent has exposed through `tool_search`. */
-    'tool-search': ToolSearchState
-  }
-}
-
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    /** Hides connector tools behind `tool_search` for every agent. */
-    connectorToolSearch: ConnectorToolSearch
-  }
-}
-
-const toolSearchStateSchema = zod.object({
-  exposed: zod.array(zod.string()),
-}).strict()
-
-/** Projection of logged exposures; a fork inherits its parent's selection. */
-export const toolSearchProjectionDefinition = {
-  key: 'tool-search',
-  stateVersion: 1,
-  stateSchema: toolSearchStateSchema,
-  init: (): ToolSearchState => ({ exposed: [] }),
-  apply: (state: ToolSearchState, event: SessionEvent): ToolSearchState => {
-    if (event.type !== 'tool-search/expose') return state
-    const exposed = [...state.exposed]
-    for (const name of event.data.tools) if (!exposed.includes(name)) exposed.push(name)
-    return { exposed }
-  },
-  wire: {
-    viewSchema: toolSearchStateSchema,
-    view: (state: ToolSearchState) => state,
-  },
-} satisfies ProjectionDefinition<'tool-search', ToolSearchState>
+/** Prefix of the guard's refusal text; the tool name follows it. */
+const UNDECLARED_MARKER = 'connector tool not declared yet: '
 
 /** Shorten text to a fixed budget with a marker the model can see. */
 function clip(text: string, max: number): string {
@@ -109,12 +60,12 @@ function readArgs(args: unknown): { query: string; server?: string | undefined }
  * before the tool body records the exposure so the conversation can continue.
  */
 export class ConnectorToolSearch extends Service {
-  static inject = ['tools', 'sessionProjections', 'agents']
+  static inject = ['tools', 'agents', 'sessions']
 
   /** Connector tools this module hides: exact name → connector label. */
   private readonly hidden = new Map<string, string>()
-  private handle: ProjectionHandle<ToolSearchState> | undefined
-  private release: (() => void) | undefined
+  /** Tools each Session's log already shows as revealed. */
+  private readonly revealed = new WeakMap<Session, Set<string>>()
   /** Per-agent scope that installed the filtering executor. */
   private readonly installed = new Map<Agent, ReturnType<Context['inject']>>()
   /** Agent whose step is being assembled, set by `agent/pre-step`. */
@@ -126,7 +77,12 @@ export class ConnectorToolSearch extends Service {
 
   protected async [Service.init](): Promise<void> {
     const ctx = this.ctx
-    this.handle = await ctx.sessionProjections.register(toolSearchProjectionDefinition)
+    // Rebuild each Session's revealed set from its own committed events, so a
+    // resumed or forked conversation reads back the same declarations.
+    // Live events only: a Session is rebuilt from its log by the provider that
+    // owns resumption, and this set is one step behind at worst, which only
+    // means a resumed turn asks for a tool again.
+    ctx.on('session/event', (session, event) => this.note(session, event))
     // Each agent's scope gets an executor whose description omits the connector
     // tools that agent has not exposed. The executor below is captured once,
     // because a scope admits only one executor.
@@ -165,9 +121,8 @@ export class ConnectorToolSearch extends Service {
     }))
     ctx.tools.guard((exec) => {
       if (exec.agent === undefined || !this.hidden.has(exec.name)) return undefined
-      if (this.stateOf(exec.agent).exposed.includes(exec.name)) return undefined
-      this.expose(exec.agent, [exec.name])
-      return `"${exec.name}" is a connector tool that was not declared yet. It is now available; call it again.`
+      if (this.stateOf(exec.agent.session).has(exec.name)) return undefined
+      return `${UNDECLARED_MARKER}${exec.name}. It is declared from your next request; call it again.`
     })
   }
 
@@ -188,11 +143,11 @@ export class ConnectorToolSearch extends Service {
 
   describe(described: ToolModelInput, agent: Agent): ToolModelInput {
     if (this.hidden.size === 0) return described
-    const exposed = this.stateOf(agent).exposed
+    const revealed = this.stateOf(agent.session)
     return {
       ...described,
       schemas: described.schemas.filter(schema =>
-        !this.hidden.has(schema.name) || exposed.includes(schema.name)),
+        !this.hidden.has(schema.name) || revealed.has(schema.name)),
     }
   }
 
@@ -204,18 +159,45 @@ export class ConnectorToolSearch extends Service {
     return this.hidden.size > 0
   }
 
-  /** Selection for one Session, seeded from its log. */
-  private stateOf(agent: Agent): ToolSearchState {
-    if (this.handle === undefined) throw new Error('connector tool search is not ready')
-    return this.handle.stateOf(agent.session)
+  /** Tools one Session's log shows as revealed. */
+  private stateOf(session: Session): Set<string> {
+    let state = this.revealed.get(session)
+    if (state === undefined) {
+      state = new Set()
+      this.revealed.set(session, state)
+    }
+    return state
   }
 
-  /** Append newly visible names; the projection applies them before the next step. */
-  private expose(agent: Agent, names: readonly string[]): void {
-    const state = this.stateOf(agent)
-    const fresh = names.filter(name => !state.exposed.includes(name))
-    if (fresh.length === 0) return
-    agent.session.append('tool-search/expose', { tools: fresh })
+  /** Record an event that reveals connector tools. */
+  private note(session: Session, event: SessionEvent): void {
+    this.fold(this.stateOf(session), event)
+  }
+
+  /**
+   * Fold one committed event into a revealed set. A `tool_search` result names
+   * its matches in a fixed line; the guard's refusal names one tool.
+   * @param state - the Session's revealed set, updated in place.
+   * @param event - committed session event.
+   */
+  private fold(state: Set<string>, event: SessionEvent): void {
+    if (event.type !== 'tool/result') return
+    const message = event.data.message
+    if (message.source.kind !== 'tool') return
+    const text = message.content.map(block => block.type === 'text' ? block.text : '').join('\n')
+    const match = /matching connector tool\(s\), now callable:\n([\s\S]*)$/u.exec(text)
+    if (match !== null) {
+      for (const line of (match[1] ?? '').split('\n')) {
+        const name = /^### (\S+)$/u.exec(line)?.[1]
+        if (name !== undefined) state.add(name)
+      }
+      return
+    }
+    const at = text.indexOf(UNDECLARED_MARKER)
+    if (at >= 0) {
+      const name = text.slice(at + UNDECLARED_MARKER.length).split(/[\s"：]/u)[0]
+      if (name !== undefined && name !== '') state.add(name)
+    }
   }
 
   /** Match the query against hidden tool declarations and expose the matches. */
@@ -239,9 +221,8 @@ export class ConnectorToolSearch extends Service {
     if (matches.length === 0) {
       return `No connector tool matches "${args.query}". Known connectors: ${[...new Set(this.hidden.values())].join(', ')}`
     }
-    this.expose(agent, matches.map(match => match.name))
     return [
-      `${String(matches.length)} matching connector tool(s), declared from your next request; you may call them now:`,
+      `${String(matches.length)} matching connector tool(s), now callable:`,
       ...matches.map(match => `\n### ${match.name}\n${match.description}\nParameters (JSON Schema): ${match.parameters}`),
     ].join('\n')
   }
@@ -262,9 +243,9 @@ export class ConnectorToolSearch extends Service {
   forget(names: readonly string[]): void {
     for (const name of names) this.hidden.delete(name)
   }
-
-  /** Release resources owned by this service (none today; the executor selection is the host's). */
-  protected [Symbol.dispose](): void {
-    this.release?.()
+}declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Hides connector tools behind `tool_search` for every agent. */
+    connectorToolSearch: ConnectorToolSearch
   }
 }
